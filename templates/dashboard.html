@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Threat Detector Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        .stat-card h3 { margin-bottom: 10px; font-size: 1.2em; opacity: 0.9; }
+        .stat-value { font-size: 2.5em; font-weight: bold; }
+        .threats-container {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        .threat-item {
+            background: rgba(255,255,255,0.05);
+            border-left: 4px solid #ff6b6b;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+        }
+        .threat-item.critical { border-color: #ff0000; }
+        .threat-item.high { border-color: #ff6b00; }
+        .threat-item.medium { border-color: #ffd700; }
+        .threat-item.low { border-color: #00ff00; }
+        .threat-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .severity-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+        .severity-critical { background-color: #ff0000; }
+        .severity-high { background-color: #ff6b00; }
+        .severity-medium { background-color: #ffd700; color: #333; }
+        .severity-low { background-color: #00ff00; color: #333; }
+        .refresh-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            color: #fff;
+            cursor: pointer;
+            font-size: 1em;
+            margin-bottom: 20px;
+        }
+        .refresh-btn:hover { background: rgba(255,255,255,0.3); }
+        .status { text-align: center; margin-top: 20px; opacity: 0.8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛡️ Cybersecurity Threat Detector</h1>
+
+        <button class="refresh-btn" onclick="refreshData()">🔄 Refresh Data</button>
+        <div class="stats-grid" id="stats">
+            <div class="stat-card">
+                <h3>Total Threats</h3>
+                <div class="stat-value" id="total-threats">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Critical Alerts</h3>
+                <div class="stat-value" id="critical-threats">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Packets</h3>
+                <div class="stat-value" id="total-packets">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Unique IPs</h3>
+                <div class="stat-value" id="unique-ips">0</div>
+            </div>
+        </div>
+
+        <div class="threats-container">
+            <h2>Recent Threats</h2>
+            <div id="threats-list"></div>
+        </div>
+
+        <div class="status" id="status">Loading...</div>
+    </div>
+
+    <script>
+        function refreshData() {
+            fetchStatistics();
+            fetchThreats();
+        }
+        function fetchStatistics() {
+            fetch('/api/statistics')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('total-threats').textContent = data.threats.total || 0;
+                    document.getElementById('critical-threats').textContent = data.threats.by_severity.CRITICAL || 0;
+                    document.getElementById('total-packets').textContent = data.activity.total_packets || 0;
+                    document.getElementById('unique-ips').textContent = data.activity.unique_ips || 0;
+                })
+                .catch(err => console.error('Error fetching statistics:', err));
+        }
+        function fetchThreats() {
+            fetch('/api/threats')
+                .then(response => response.json())
+                .then(threats => {
+                    const container = document.getElementById('threats-list');
+                    if (threats.length === 0) {
+                        container.innerHTML = '<p>No threats detected yet. System is monitoring...</p>';
+                        return;
+                    }
+                    container.innerHTML = threats.map(threat => `
+                        <div class="threat-item ${threat.severity.toLowerCase()}">
+                            <div class="threat-header">
+                                <strong>Threat #${threat.id}</strong>
+                                <span class="severity-badge severity-${threat.severity.toLowerCase()}">${threat.severity}</span>
+                            </div>
+                            <div><strong>Source IP:</strong> ${threat.src_ip}</div>
+                            <div><strong>Type:</strong> ${threat.threat_type.join(', ')}</div>
+                            <div><strong>Score:</strong> ${threat.threat_score.toFixed(2)}</div>
+                            <div><strong>Time:</strong> ${new Date(threat.timestamp).toLocaleString()}</div>
+                            ${threat.details.length > 0 ? `<div><strong>Details:</strong> ${threat.details.join(', ')}</div>` : ''}
+                        </div>
+                    `).join('');
+                })
+                .catch(err => console.error('Error fetching threats:', err));
+        }
+        function updateStatus() {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('status').textContent =
+                        `Status: ${data.status.toUpperCase()} | Version: ${data.version} | Last Update: ${new Date(data.timestamp).toLocaleTimeString()}`;
+                })
+                .catch(err => console.error('Error fetching status:', err));
+        }
+        // Initial load
+        refreshData();
+        updateStatus();
+        // Auto-refresh every 5 seconds
+        setInterval(refreshData, 5000);
+        setInterval(updateStatus, 1000);
+    </script>
+</body>
+</html>
